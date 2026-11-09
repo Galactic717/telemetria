@@ -1,4 +1,4 @@
-name: CI
+name: Rust CI
 
 on:
   push:
@@ -6,36 +6,36 @@ on:
   pull_request:
     branches: [ main, master ]
 
+env:
+  CARGO_TERM_COLOR: always
+
 jobs:
-  test:
+  build-and-test:
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest]
-        python-version: ["3.11", "3.12", "3.13"]
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python-version }}
+      - name: Install Rust stable toolchain
+        uses: dtolnay/rust-toolchain@stable
 
-      - name: Install package and dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -e ".[dev]"
+      - name: Cache Cargo registry and build
+        uses: Swatinem/rust-cache@v2
 
-      - name: Run pytest suite
-        run: |
-          pytest -v
+      - name: Build release binaries
+        run: cargo build --release
 
-      - name: Smoke test CLI commands
+      - name: Run integration & unit tests
+        run: cargo test --verbose
+
+      - name: Smoke test CLI subcommands
         run: |
-          telemetria --help
-          telemetria status --json
-          telemetria tariffs --offline
-          telemetria mining --offline
-          telemetria dashboard --once --offline
+          cargo run --release --bin telemetria -- --version
+          cargo run --release --bin telemetria -- status --offline --json
+          cargo run --release --bin telemetria -- tariffs --offline
+          cargo run --release --bin telemetria -- mining --offline
+          cargo run --release --bin telemetria -- benchmark --iterations 3 --offline
